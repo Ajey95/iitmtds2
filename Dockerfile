@@ -1,37 +1,46 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
-# --- System deps required by Playwright browsers AND Tesseract ---
-# Added 'tesseract-ocr' to the install list
-RUN apt-get update && apt-get install -y \
-    wget gnupg ca-certificates curl unzip \
-    # Playwright dependencies
-    libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon0 \
-    libgtk-3-0 libgbm1 libasound2 libxcomposite1 libxdamage1 libxrandr2 \
-    libxfixes3 libpango-1.0-0 libcairo2 \
-    # Tesseract OCR engine
-    tesseract-ocr \
-    && rm -rf /var/lib/apt/lists/*
-
-# --- Install Playwright + Chromium ---
-RUN pip install playwright && playwright install --with-deps chromium
-
-# --- Install uv package manager ---
-RUN pip install uv
-
-# --- Copy app to container ---
+# Set working directory
 WORKDIR /app
 
-COPY . .
+# Install system dependencies for Chrome and Selenium
+RUN apt-get update && apt-get install -y \
+    wget \
+    gnupg \
+    unzip \
+    curl \
+    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update \
+    && apt-get install -y google-chrome-stable \
+    && rm -rf /var/lib/apt/lists/*
 
+# Install ChromeDriver
+RUN CHROMEDRIVER_VERSION=$(curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE) && \
+    wget -q -O /tmp/chromedriver.zip https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip && \
+    unzip /tmp/chromedriver.zip -d /usr/local/bin/ && \
+    rm /tmp/chromedriver.zip && \
+    chmod +x /usr/local/bin/chromedriver
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY main.py .
+
+# Expose port
+EXPOSE 5000
+
+# Set environment variables
 ENV PYTHONUNBUFFERED=1
-ENV PYTHONIOENCODING=utf-8
+ENV PORT=5000
 
-# --- Install project dependencies using uv ---
-RUN uv sync --frozen
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000/health || exit 1
 
-# HuggingFace Spaces exposes port 7860
-EXPOSE 7860
-
-# --- Run your FastAPI app ---
-# uvicorn must be in pyproject dependencies
-CMD ["uv", "run", "main.py"]
+# Run the application
+CMD ["python", "main.py"]
