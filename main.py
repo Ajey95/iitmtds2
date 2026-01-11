@@ -28,7 +28,7 @@ app = Flask(__name__)
 
 EMAIL = "24f1001493@ds.study.iitm.ac.in"
 SECRET = "MyS3cur3AndUn1qu3S3cr3tStr1ng_2025"
-GEMINI_API_KEY = "AIzaSyDyZGdEHEiKpoiAEKjCwlbuZBj1CDTX0UM"
+GEMINI_API_KEY = "get-your-api-key"
 
 # Configure Gemini
 genai.configure(api_key=GEMINI_API_KEY)
@@ -823,4 +823,5 @@ if __name__ == '__main__':
         solve_quiz_sequence(url)
     else:
         print(f"\n🚀 SERVER MODE\nEmail: {EMAIL}\n")
+
         app.run(host='0.0.0.0', port=5000, debug=False)
